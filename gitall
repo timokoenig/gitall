@@ -1,0 +1,228 @@
+#!/bin/sh
+#===============================================================================
+# Title             gitall
+# Author            Timo Koenig <dev@timokoenig.de>
+# Date              12/14/2017
+# Version           0.1
+# Description       Execute git commands over all repositories in current directory
+# License           MIT License
+# Source            https://github.com/timokoenig/gitall
+#===============================================================================
+
+REPOSITORIES=$(pwd)
+VERBOSE=false
+EXEC_ON_BRANCH=""
+EXEC_ON_REPO=""
+GIT_PREFIX="[git:"
+GIT_SUFFIX="]\033[0m"
+GIT_DIRTY="\033[31m+"
+GIT_CLEAN="\033[32m"
+
+#===============================================================================
+
+# Main function
+function gitall() {
+    # Check number of repositories in current directory
+    if [ "$(list_repos)" = "" ]; then
+        echo "gitall: No Git repositories found"
+        return
+    fi
+
+    if [ $# -eq 0 ]; then
+        # List all repositories
+        local cmd=("repo_status")
+        list_repos | execute cmd[@]
+
+    else
+        # Enable verbose mode
+        if [ "$1" = "-v" ]; then
+            VERBOSE=true
+            shift
+        fi
+
+        # Execute commands only on repositories with a specific branch
+        if [ "$1" = "--branch" ]; then
+            shift
+            EXEC_ON_BRANCH="$1"
+            shift
+        fi
+
+        # Execute commands only on a specific repository
+        if [ "$1" = "--name" ]; then
+            shift
+            EXEC_ON_REPO="$1"
+            shift
+        fi
+
+        case "$1" in
+            help)
+                # Show help
+                echo $"Usage: gitall [-v | --branch | --name] {help | * | update | remove-pods | clean}"
+                exit 1
+                ;;
+            update)
+                # Update repositories
+                local cmd=(
+                    "show_repo \"Update (fetch / pull / clean_branch)\""
+                    "git fetch"
+                    "git pull"
+                    "clean_branch"
+                    "echo \"\""
+                )
+                list_repos | execute cmd[@]
+                ;;
+            remove-pods)
+                # Remove pods
+                local cmd=(
+                    "show_repo \"Remove Pods\""
+                    "remove_pods"
+                    "echo \"\""
+                )
+                list_repos | execute cmd[@]
+                ;;
+            clean)
+                # Clean git repositories
+                local cmd=(
+                    "show_repo \"Clean (remove_pods / remove staged & unstaged files / checkout master)\""
+                    "remove_pods"
+                    "git reset --hard && git clean -fd"
+                    "git checkout master"
+                    "git fetch"
+                    "git pull"
+                    "clean_branch"
+                    "echo \"\""
+                )
+                echo "You are about to clean all repositories. Are you sure?"
+                select yn in "Yes" "No"; do
+                    case $yn in
+                        Yes ) list_repos | execute cmd[@]; break;;
+                        No ) exit;;
+                    esac
+                done
+                ;;
+            *)
+                # Execute git command
+                local git_cmd="$@"
+                local cmd=(
+                    "show_repo \"git\""
+                    "git $git_cmd"
+                    "echo \"\""
+                )
+                list_repos | execute cmd[@]
+                ;;
+        esac
+    fi
+}
+
+# List all repositories in the current directory
+function list_repos() {
+    for REPO in $(ls "$REPOSITORIES/"); do
+        if [ -d "$REPOSITORIES/$REPO" ]; then
+            if [ -d "$REPOSITORIES/$REPO/.git" ]; then
+                local list_repo=true
+                cd "$REPOSITORIES/$REPO"
+                if [[ ("$EXEC_ON_BRANCH" != "") && ("$EXEC_ON_BRANCH" != $(current_branch)) ]]; then
+                    list_repo=false
+                fi
+                cd ".."
+                if [[ ("$EXEC_ON_REPO" != "") && ("$EXEC_ON_REPO" != "$REPO") ]]; then
+                    list_repo=false
+                fi
+
+                if [ "$list_repo" = true ]; then
+                    echo $REPO
+                fi
+            fi
+        fi
+    done
+}
+
+# Execute an array of commands on listed repositories
+function execute() {
+    while read -r REPO; do
+        cd "$REPOSITORIES/$REPO"
+        declare -a args=("${!1}")
+        for CMD in "${args[@]}"; do
+            eval "$CMD"
+        done
+        cd "$REPOSITORIES"
+    done
+}
+
+# Display repository status
+function repo_status() {
+    printf "%-40s\t%s\n" $REPO $(git_prompt_info)
+}
+
+# Show repository name and given command
+function show_repo() {
+    echo ">>> $REPO | $1 <<<"
+}
+
+# Delete all merged branches from the git repository
+function clean_branch() {
+    git branch --merged origin/master | grep -v master | xargs git branch -d
+    git fetch --prune --all
+}
+
+# Remove CocoaPods from Xcode project
+function remove_pods() {
+    if [ $1 ]; then cd $1; fi
+    for FILE in $(ls); do
+        if [[ $FILE == *".xcodeproj" ]]; then
+            if [ "$VERBOSE" = true ]; then pod deintegrate; else pod deintegrate > /dev/null; fi
+            echo "Pods removed"
+            return
+        fi
+    done
+    for DIR in $(ls); do
+        if [ -d $DIR ]; then
+            remove_pods $DIR
+        fi
+    done
+}
+
+# Outputs current branch info in prompt format
+function git_prompt_info() {
+    ref=$(git symbolic-ref HEAD 2> /dev/null) || return
+    echo "$(parse_git_dirty)$GIT_PREFIX$(current_branch)$GIT_SUFFIX"
+}
+
+# Checks if working tree is dirty
+function parse_git_dirty() {
+    local STATUS=''
+    local FLAGS
+    FLAGS=('--porcelain')
+    if [[ "$(command git config --get oh-my-zsh.hide-dirty)" != "1" ]]; then
+        if [[ $POST_1_7_2_GIT -gt 0 ]]; then
+            FLAGS+='--ignore-submodules=dirty'
+        fi
+        if [[ "$DISABLE_UNTRACKED_FILES_DIRTY" == "true" ]]; then
+            FLAGS+='--untracked-files=no'
+        fi
+        STATUS=$(command git status ${FLAGS} 2> /dev/null | tail -n1)
+    fi
+    if [[ -n $STATUS ]]; then
+        echo "$GIT_DIRTY"
+    else
+        echo "$GIT_CLEAN"
+    fi
+}
+
+# Outputs the name of the current branch
+# Usage example: git pull origin $(git_current_branch)
+# Using '--quiet' with 'symbolic-ref' will not cause a fatal error (128) if
+# it's not a symbolic ref, but in a Git repo.
+function current_branch() {
+    local ref
+    ref=$(command git symbolic-ref --quiet HEAD 2> /dev/null)
+    local ret=$?
+    if [[ $ret != 0 ]]; then
+        [[ $ret == 128 ]] && return  # no git repo.
+        ref=$(command git rev-parse --short HEAD 2> /dev/null) || return
+    fi
+    echo ${ref#refs/heads/}
+}
+
+# Call main function
+gitall $@
