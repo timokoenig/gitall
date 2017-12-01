@@ -57,7 +57,7 @@ function gitall() {
         case "$1" in
             help)
                 # Show help
-                echo $"Usage: gitall [-v | --branch | --name] {help | * | update | remove-pods | clean}"
+                echo $"Usage: gitall [-v | --branch | --name] {help | * | update | remove-pods | clean | latest-tags}"
                 exit 1
                 ;;
             update)
@@ -100,6 +100,17 @@ function gitall() {
                     esac
                 done
                 ;;
+            latest-tags)
+            	# Shows the latest tag for each repo
+            	local fetch_cmd=("git fetch")
+            	local tag_cmd=(
+            		"show_repo"
+            		"git describe --abbrev=0 --tags"
+            	)
+            	echo "Updating repos…"
+            	list_repos | execute fetch_cmd[@]
+            	list_repos | execute tag_cmd[@]
+            	;;
             *)
                 # Execute git command
                 local git_cmd="$@"
