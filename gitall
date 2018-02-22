@@ -3,7 +3,7 @@
 # Title             gitall
 # Author            Timo Koenig <dev@timokoenig.de>
 # Date              12/14/2017
-# Version           0.1
+# Version           0.2
 # Description       Execute git commands over all repositories in current directory
 # License           MIT License
 # Source            https://github.com/timokoenig/gitall
