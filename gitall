@@ -57,7 +57,7 @@ function gitall() {
         case "$1" in
             help)
                 # Show help
-                echo $"Usage: gitall [-v | --branch | --name] {help | * | update | remove-pods | clean | latest-tags}"
+                echo $"Usage: gitall [-v | --branch | --name] {help | * | update | deintegrate | clean | latest-tags}"
                 exit 1
                 ;;
             update)
@@ -71,11 +71,11 @@ function gitall() {
                 )
                 list_repos | execute cmd[@]
                 ;;
-            remove-pods)
+            deintegrate)
                 # Remove pods
                 local cmd=(
                     "show_repo \"Remove Pods\""
-                    "remove_pods"
+                    "deintegrate_pods"
                     "echo \"\""
                 )
                 list_repos | execute cmd[@]
@@ -83,8 +83,8 @@ function gitall() {
             clean)
                 # Clean git repositories
                 local cmd=(
-                    "show_repo \"Clean (remove_pods / remove staged & unstaged files / checkout master)\""
-                    "remove_pods"
+                    "show_repo \"Clean (deintegrate_pods / remove staged & unstaged files / checkout master)\""
+                    "deintegrate_pods"
                     "git reset --hard && git clean -fd"
                     "git checkout master"
                     "git fetch"
@@ -177,7 +177,7 @@ function clean_branch() {
 }
 
 # Remove CocoaPods from Xcode project
-function remove_pods() {
+function deintegrate_pods() {
     if [ $1 ]; then cd $1; fi
     for FILE in $(ls); do
         if [[ $FILE == *".xcodeproj" ]]; then
@@ -188,7 +188,7 @@ function remove_pods() {
     done
     for DIR in $(ls); do
         if [ -d $DIR ]; then
-            remove_pods $DIR
+            deintegrate_pods $DIR
         fi
     done
 }
