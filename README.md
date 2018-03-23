@@ -3,7 +3,7 @@ Execute git commands over all repositories in current directory
 
 ### Usage
 ```sh
-$ gitall [-v | --branch | --name] {help | * | update | remove-pods | clean}
+$ gitall [-v | --branch | --name] {help | * | update | deintegrate | clean}
 ```
 
 ##### Show git status
@@ -21,7 +21,7 @@ $ gitall update
 ##### Deintegrate CocoaPods in all repositories
 
 ```sh
-$ gitall remove-pods
+$ gitall deintegrate
 ```
 
 ##### Checkout branch in repositories
