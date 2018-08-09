@@ -63,9 +63,8 @@ function gitall() {
             update)
                 # Update repositories
                 local cmd=(
-                    "show_repo \"Update (fetch / pull / clean_branch)\""
-                    "git fetch"
-                    "git pull"
+                    "show_repo \"Update (pull / clean_branch)\""
+                    "git pull --rebase"
                     "clean_branch"
                     "echo \"\""
                 )
@@ -87,8 +86,7 @@ function gitall() {
                     "deintegrate_pods"
                     "git reset --hard && git clean -fd"
                     "git checkout master"
-                    "git fetch"
-                    "git pull"
+                    "git pull --rebase"
                     "clean_branch"
                     "echo \"\""
                 )
